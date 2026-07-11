@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -287,33 +288,44 @@ func (h *OrderHandler) AdvanceCourse(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
-	var currentOrder domain.Order
-	h.db.QueryRow(r.Context(), `SELECT id, status FROM orders WHERE id = $1`, orderID).Scan(&currentOrder.ID, &currentOrder.Status)
-	if currentOrder.Status != "sent" {
-		respondError(w, "order is not active", http.StatusBadRequest)
+	var curStatus string
+	h.db.QueryRow(r.Context(), `SELECT status FROM orders WHERE id = $1`, orderID).Scan(&curStatus)
+	if curStatus != "sent" && curStatus != "pending" {
+		respondError(w, "order cannot advance", http.StatusBadRequest)
 		return
 	}
 
-	// Find active course and set to completed, then set next course to active
-	var activeID int64
-	err = tx.QueryRow(r.Context(),
-		`UPDATE courses SET status = 'completed' WHERE order_id = $1 AND status = 'active' RETURNING id`,
-		orderID).Scan(&activeID)
-	if err != nil {
+	// Set current active course to completed
+	ct, err := tx.Exec(r.Context(),
+		`UPDATE courses SET status = 'completed' WHERE order_id = $1 AND status = 'active'`,
+		orderID)
+	if err != nil || ct.RowsAffected() == 0 {
+		slog.Error("advance: no active course", "error", err, "order_id", orderID)
 		respondError(w, "no active course found", http.StatusBadRequest)
 		return
 	}
+	slog.Info("advance: completed active course", "order_id", orderID)
 
-	var nextID int64
-	err = tx.QueryRow(r.Context(),
-		`UPDATE courses SET status = 'active' WHERE order_id = $1 AND status = 'pending' ORDER BY display_order LIMIT 1 RETURNING id`,
-		orderID).Scan(&nextID)
+	// Set next pending course to active
+	ct2, err := tx.Exec(r.Context(),
+		`UPDATE courses SET status = 'active'
+		 WHERE id = (SELECT id FROM courses WHERE order_id = $1 AND status = 'pending' ORDER BY display_order LIMIT 1)`,
+		orderID)
 	if err != nil {
-		// No more courses - mark order as completed
-		tx.Exec(r.Context(), `UPDATE orders SET status = 'completed' WHERE id = $1`, orderID)
+		slog.Error("advance: activate next course failed", "error", err, "order_id", orderID)
+	}
+	if ct2.RowsAffected() == 0 {
+		slog.Info("advance: no pending course, completing order", "order_id", orderID)
+		_, err := tx.Exec(r.Context(), `UPDATE orders SET status = 'completed' WHERE id = $1`, orderID)
+		if err != nil {
+			slog.Error("advance: complete order failed", "error", err, "order_id", orderID)
+		}
+	} else {
+		slog.Info("advance: activated next course", "order_id", orderID)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
+		slog.Error("advance: commit failed", "error", err, "order_id", orderID)
 		respondError(w, "commit error", http.StatusInternalServerError)
 		return
 	}

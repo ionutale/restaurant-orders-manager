@@ -46,7 +46,7 @@ func (h *FloorPlanHandler) GetFloorPlan(w http.ResponseWriter, r *http.Request) 
 	var tables []floorPlanTable
 	for rows.Next() {
 		var t floorPlanTable
-		if err := rows.Scan(&t.ID, &t.Name, &t.Capacity, &t.X, &t.Y, &t.Label, &t.Status, &t.GroupName, &t.PartySize); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.Capacity, &t.X, &t.Y, &t.Label, &t.Status, &t.GroupID, &t.GroupName, &t.PartySize); err != nil {
 			respondError(w, "scan error", http.StatusInternalServerError)
 			return
 		}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -89,6 +90,7 @@ func (h *ChefSuggestionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		input.Name, input.Description, input.PriceCents, expiresAt, claims.UserID,
 	).Scan(&s.ID, &s.Name, &s.Description, &s.PriceCents, &s.ShiftDate, &s.ExpiresAt, &s.ChefID, &s.CreatedAt)
 	if err != nil {
+		slog.Error("create suggestion", "error", err)
 		respondError(w, "could not create suggestion", http.StatusInternalServerError)
 		return
 	}

@@ -54,6 +54,12 @@ func main() {
 		r.Use(auth.Middleware(jwt))
 
 		r.Get("/me", handler.Me(db))
+
+		th := handler.NewTableHandler(db)
+		r.Get("/tables", th.List)
+		r.Post("/tables", th.Create)
+		r.Patch("/tables/{id}", th.Update)
+		r.Delete("/tables/{id}", th.Delete)
 	})
 
 	srv := &http.Server{

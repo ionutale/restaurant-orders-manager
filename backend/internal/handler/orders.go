@@ -218,6 +218,112 @@ func (h *OrderHandler) Send(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, h.loadOrder(r.Context(), orderID))
 }
 
+func (h *OrderHandler) KDSOrders(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Query(r.Context(),
+		`SELECT id, table_group_id, waiter_id, status, created_at FROM orders WHERE status = 'sent' ORDER BY created_at`)
+	if err != nil {
+		respondError(w, "database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var orders []domain.Order
+	for rows.Next() {
+		var o domain.Order
+		rows.Scan(&o.ID, &o.TableGroupID, &o.WaiterID, &o.Status, &o.CreatedAt)
+		orders = append(orders, o)
+	}
+
+	for i := range orders {
+		full := h.loadOrder(r.Context(), orders[i].ID)
+		// Only include active course items for KDS
+		var active []domain.OrderCourse
+		for _, c := range full.Courses {
+			if c.Status == "active" {
+				active = append(active, c)
+			}
+		}
+		orders[i].Courses = active
+	}
+	if orders == nil {
+		orders = []domain.Order{}
+	}
+	respondJSON(w, orders)
+}
+
+func (h *OrderHandler) MarkItemReady(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	itemID, err := strconv.ParseInt(chi.URLParam(r, "itemId"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid item id", http.StatusBadRequest)
+		return
+	}
+
+	_, err = h.db.Exec(r.Context(),
+		`UPDATE order_items SET ready = true, ready_at = NOW() WHERE id = $1`, itemID)
+	if err != nil {
+		respondError(w, "item not found", http.StatusNotFound)
+		return
+	}
+
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "order_item.ready", "order_item", &itemID, nil)
+	}
+	respondJSON(w, map[string]string{"status": "ok"})
+}
+
+func (h *OrderHandler) AdvanceCourse(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		respondError(w, "database error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var currentOrder domain.Order
+	h.db.QueryRow(r.Context(), `SELECT id, status FROM orders WHERE id = $1`, orderID).Scan(&currentOrder.ID, &currentOrder.Status)
+	if currentOrder.Status != "sent" {
+		respondError(w, "order is not active", http.StatusBadRequest)
+		return
+	}
+
+	// Find active course and set to completed, then set next course to active
+	var activeID int64
+	err = tx.QueryRow(r.Context(),
+		`UPDATE courses SET status = 'completed' WHERE order_id = $1 AND status = 'active' RETURNING id`,
+		orderID).Scan(&activeID)
+	if err != nil {
+		respondError(w, "no active course found", http.StatusBadRequest)
+		return
+	}
+
+	var nextID int64
+	err = tx.QueryRow(r.Context(),
+		`UPDATE courses SET status = 'active' WHERE order_id = $1 AND status = 'pending' ORDER BY display_order LIMIT 1 RETURNING id`,
+		orderID).Scan(&nextID)
+	if err != nil {
+		// No more courses - mark order as completed
+		tx.Exec(r.Context(), `UPDATE orders SET status = 'completed' WHERE id = $1`, orderID)
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		respondError(w, "commit error", http.StatusInternalServerError)
+		return
+	}
+
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "order.course_advanced", "order", &orderID, nil)
+	}
+	respondJSON(w, h.loadOrder(r.Context(), orderID))
+}
+
 func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 	var o domain.Order
 	h.db.QueryRow(ctx,
@@ -233,7 +339,7 @@ func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 			cRows.Scan(&c.ID, &c.OrderID, &c.Name, &c.DisplayOrder, &c.Status)
 
 			iRows, _ := h.db.Query(ctx,
-				`SELECT oi.id, oi.course_id, oi.dish_id, oi.is_chef_suggestion, oi.chef_suggestion_id, oi.quantity, oi.notes, oi.added_at,
+				`SELECT oi.id, oi.course_id, oi.dish_id, oi.is_chef_suggestion, oi.chef_suggestion_id, oi.quantity, oi.notes, oi.ready, oi.ready_at, oi.added_at,
 					COALESCE(d.name, cs.name, '') as dish_name
 				 FROM order_items oi
 				 LEFT JOIN dishes d ON d.id = oi.dish_id
@@ -242,7 +348,7 @@ func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 			if iRows != nil {
 				for iRows.Next() {
 					var item domain.OrderItem
-					iRows.Scan(&item.ID, &item.CourseID, &item.DishID, &item.IsChefSuggestion, &item.ChefSuggestionID, &item.Quantity, &item.Notes, &item.AddedAt, &item.DishName)
+					iRows.Scan(&item.ID, &item.CourseID, &item.DishID, &item.IsChefSuggestion, &item.ChefSuggestionID, &item.Quantity, &item.Notes, &item.Ready, &item.ReadyAt, &item.AddedAt, &item.DishName)
 					c.Items = append(c.Items, item)
 				}
 				iRows.Close()

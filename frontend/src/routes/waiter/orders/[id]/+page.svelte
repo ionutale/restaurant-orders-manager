@@ -45,6 +45,11 @@
 		sending = false;
 	}
 
+	async function advanceCourse() {
+		const r = await fetch(`${API_BASE}/orders/${params.id}/advance-course`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
+		if (r.ok) order = await r.json();
+	}
+
 	async function addDish(courseId: number, dishId: number) {
 		await fetch(`${API_BASE}/orders/${params.id}/courses/${courseId}/items`, {
 			method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
@@ -92,6 +97,9 @@
 						{sending ? 'Sending...' : 'Send to KDS'}
 					</button>
 				{/if}
+				{#if order.status === 'sent'}
+					<button class="btn btn-warning btn-sm" onclick={advanceCourse}>Advance Course</button>
+				{/if}
 			</div>
 		</div>
 
@@ -104,7 +112,7 @@
 								{course.name}
 								<span class="badge badge-sm">{course.status}</span>
 							</h3>
-							<button class="btn btn-primary btn-sm" onclick={() => { showMenu = course.id; addQty = 1; addNotes = ''; }}>+ Add Dish</button>
+							{#if order.status === 'pending'}<button class="btn btn-primary btn-sm" onclick={() => { showMenu = course.id; addQty = 1; addNotes = ''; }}>+ Add Dish</button>{/if}
 						</div>
 
 						{#if course.items.length === 0}

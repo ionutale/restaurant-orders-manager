@@ -19,13 +19,15 @@ type OrderCourse struct {
 }
 
 type OrderItem struct {
-	ID                int64  `json:"id"`
-	CourseID          int64  `json:"course_id"`
-	DishID            *int64 `json:"dish_id"`
-	IsChefSuggestion  bool   `json:"is_chef_suggestion"`
-	ChefSuggestionID  *int64 `json:"chef_suggestion_id"`
-	Quantity          int    `json:"quantity"`
-	Notes             string `json:"notes"`
-	AddedAt           string `json:"added_at"`
-	DishName          string `json:"dish_name,omitempty"`
+	ID                int64   `json:"id"`
+	CourseID          int64   `json:"course_id"`
+	DishID            *int64  `json:"dish_id"`
+	IsChefSuggestion  bool    `json:"is_chef_suggestion"`
+	ChefSuggestionID  *int64  `json:"chef_suggestion_id"`
+	Quantity          int     `json:"quantity"`
+	Notes             string  `json:"notes"`
+	Ready             bool    `json:"ready"`
+	ReadyAt           *string `json:"ready_at,omitempty"`
+	AddedAt           string  `json:"added_at"`
+	DishName          string  `json:"dish_name,omitempty"`
 }

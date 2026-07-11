@@ -6,7 +6,7 @@
 
 	if (auth.role !== 'manager') goto('/login');
 
-	const API = 'http://localhost:8080/api';
+	import { API_BASE } from '$lib/config';
 
 	type Table = {
 		id: number;
@@ -48,7 +48,7 @@
 	async function load() {
 		try {
 			const token = localStorage.getItem('token');
-			const res = await fetch(`${API}/tables`, { headers: { Authorization: `Bearer ${token}` } });
+			const res = await fetch(`${API_BASE}/tables`, { headers: { Authorization: `Bearer ${token}` } });
 			if (!res.ok) throw new Error('Failed to load');
 			tables = await res.json();
 		} catch (e: any) {
@@ -81,7 +81,7 @@
 	async function create() {
 		if (!newName) return;
 		const token = localStorage.getItem('token');
-		await fetch(`${API}/tables`, {
+		await fetch(`${API_BASE}/tables`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 			body: JSON.stringify({ name: newName, capacity: newCapacity, label: newLabel || null }),
@@ -94,7 +94,7 @@
 
 	async function save(id: number, name: string, capacity: number, label: string) {
 		const token = localStorage.getItem('token');
-		await fetch(`${API}/tables/${id}`, {
+		await fetch(`${API_BASE}/tables/${id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 			body: JSON.stringify({ name, capacity, label: label || null }),
@@ -105,7 +105,7 @@
 
 	async function remove(id: number) {
 		const token = localStorage.getItem('token');
-		await fetch(`${API}/tables/${id}`, {
+		await fetch(`${API_BASE}/tables/${id}`, {
 			method: 'DELETE',
 			headers: { Authorization: `Bearer ${token}` },
 		});
@@ -115,7 +115,7 @@
 
 	async function updatePosition(id: number, data: Partial<Table>) {
 		const token = localStorage.getItem('token');
-		await fetch(`${API}/tables/${id}`, {
+		await fetch(`${API_BASE}/tables/${id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 			body: JSON.stringify(data),
@@ -133,7 +133,7 @@
 	async function addFromDialog() {
 		if (!addName) return;
 		const token = localStorage.getItem('token');
-		const res = await fetch(`${API}/tables`, {
+		const res = await fetch(`${API_BASE}/tables`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 			body: JSON.stringify({ name: addName, capacity: addCapacity, label: addLabel || null }),

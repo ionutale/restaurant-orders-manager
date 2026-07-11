@@ -5,7 +5,7 @@
 
 	if (auth.role !== 'manager') goto('/login');
 
-	const API = 'http://localhost:8080/api';
+	import { API_BASE } from '$lib/config';
 
 	type Category = {
 		id: number;
@@ -26,7 +26,7 @@
 
 	async function load() {
 		const token = localStorage.getItem('token');
-		const res = await fetch(`${API}/categories`, { headers: { Authorization: `Bearer ${token}` } });
+		const res = await fetch(`${API_BASE}/categories`, { headers: { Authorization: `Bearer ${token}` } });
 		if (res.ok) categories = await res.json();
 		loading = false;
 	}
@@ -36,7 +36,7 @@
 	async function create() {
 		if (!newName) return;
 		const token = localStorage.getItem('token');
-		const res = await fetch(`${API}/categories`, {
+		const res = await fetch(`${API_BASE}/categories`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 			body: JSON.stringify({ name: newName, icon: newIcon || undefined }),
@@ -51,7 +51,7 @@
 
 	async function save(id: number) {
 		const token = localStorage.getItem('token');
-		await fetch(`${API}/categories/${id}`, {
+		await fetch(`${API_BASE}/categories/${id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 			body: JSON.stringify({ name: editName, icon: editIcon || undefined }),
@@ -62,7 +62,7 @@
 
 	async function remove(id: number) {
 		const token = localStorage.getItem('token');
-		await fetch(`${API}/categories/${id}`, {
+		await fetch(`${API_BASE}/categories/${id}`, {
 			method: 'DELETE',
 			headers: { Authorization: `Bearer ${token}` },
 		});
@@ -72,7 +72,7 @@
 
 	async function move(id: number, delta: number) {
 		const token = localStorage.getItem('token');
-		const res = await fetch(`${API}/categories/reorder`, {
+		const res = await fetch(`${API_BASE}/categories/reorder`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
 			body: JSON.stringify({ id, delta }),

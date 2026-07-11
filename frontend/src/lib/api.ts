@@ -1,4 +1,4 @@
-const API = 'http://localhost:8080/api';
+import { API_BASE } from '$lib/config';
 
 export class ApiError extends Error {
 	constructor(public status: number, message: string) {
@@ -14,7 +14,7 @@ async function request(path: string, opts: RequestInit = {}) {
 	};
 	if (token) headers['Authorization'] = `Bearer ${token}`;
 
-	const res = await fetch(`${API}${path}`, { ...opts, headers });
+	const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
 	if (!res.ok) {
 		const body = await res.json().catch(() => ({ error: res.statusText }));
 		throw new ApiError(res.status, body.error);

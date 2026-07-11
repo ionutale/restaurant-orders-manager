@@ -1,0 +1,1 @@
+-- No-op down: we don't remove seeded users on rollback

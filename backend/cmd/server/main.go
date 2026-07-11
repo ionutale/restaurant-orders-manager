@@ -132,6 +132,9 @@ func main() {
 		r.Post("/users", uh.Create)
 		r.Patch("/users/{id}", uh.Update)
 		r.Delete("/users/{id}", uh.Delete)
+
+		uploadHandler := handler.NewUploadHandler(db, envOrDefault("UPLOAD_DIR", "./uploads"))
+		r.Post("/upload", uploadHandler.Upload)
 	})
 
 	srv := &http.Server{

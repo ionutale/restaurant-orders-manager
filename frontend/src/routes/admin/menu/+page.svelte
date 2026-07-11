@@ -26,6 +26,7 @@
 	let dishEditPrice = $state(0);
 	let dishEditCat = $state(0);
 	let dishEditTime = $state(10);
+	let dishEditImage = $state('');
 	let dishDeleteId = $state<number | null>(null);
 	let dishAdding = $state(false);
 	let dName = $state('');
@@ -33,6 +34,7 @@
 	let dPrice = $state(0);
 	let dCat = $state(0);
 	let dTime = $state(10);
+	let dImage = $state('');
 
 	let detailDishId = $state<number | null>(null);
 	let detailDishName = $state('');
@@ -155,22 +157,37 @@
 
 	async function createDish() {
 		if (!dName || !dCat) return;
+		let url = dImage;
+		const fileInput = document.getElementById('create-image-upload') as HTMLInputElement;
+		if (fileInput?.files?.[0]) url = await uploadImage(fileInput.files[0]) || dImage;
 		await fetch(`${API_BASE}/dishes`, {
 			method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-			body: JSON.stringify({ name: dName, description: dDesc, price_cents: Math.round(dPrice * 100), category_id: dCat, eating_time_min: dTime }),
+			body: JSON.stringify({ name: dName, description: dDesc, price_cents: Math.round(dPrice * 100), category_id: dCat, eating_time_min: dTime, image_url: url }),
 		});
-		dName = ''; dDesc = ''; dPrice = 0; dCat = 0; dTime = 10; dishAdding = false; await loadDishes();
+		dName = ''; dDesc = ''; dPrice = 0; dCat = 0; dTime = 10; dImage = ''; dishAdding = false; await loadDishes();
+	}
+
+	async function uploadImage(file: File): Promise<string> {
+		const fd = new FormData();
+		fd.append('file', file);
+		const r = await fetch(`${API_BASE}/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd });
+		if (r.ok) { const d = await r.json(); return d.url; }
+		return '';
 	}
 
 	function startEditDish(d: any) {
 		dishEditingId = d.id; dishEditName = d.name; dishEditDesc = d.description;
 		dishEditPrice = d.price_cents; dishEditCat = d.category_id; dishEditTime = d.eating_time_min;
+		dishEditImage = d.image_url || '';
 	}
 
 	async function saveDish(id: number) {
+		let url = dishEditImage;
+		const fileInput = document.getElementById('edit-image-upload') as HTMLInputElement;
+		if (fileInput?.files?.[0]) url = await uploadImage(fileInput.files[0]) || dishEditImage;
 		await fetch(`${API_BASE}/dishes/${id}`, {
 			method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-			body: JSON.stringify({ name: dishEditName, description: dishEditDesc, price_cents: dishEditPrice, category_id: dishEditCat, eating_time_min: dishEditTime }),
+			body: JSON.stringify({ name: dishEditName, description: dishEditDesc, price_cents: dishEditPrice, category_id: dishEditCat, eating_time_min: dishEditTime, image_url: url }),
 		});
 		dishEditingId = null; await loadDishes();
 	}
@@ -314,6 +331,9 @@
 				</div>
 				<label class="form-control"><div class="label"><span class="label-text">Category</span></div>
 					<select bind:value={dCat} class="select select-bordered"><option value={0} disabled>Select</option>{#each categories as c}<option value={c.id}>{c.name}</option>{/each}</select>
+				</label>
+				<label class="form-control"><div class="label"><span class="label-text">Image</span></div>
+					<input type="file" id="create-image-upload" accept="image/jpeg,image/png,image/webp" class="file-input file-input-bordered" />
 				</label>
 			</div>
 			<div class="modal-action"><button class="btn" onclick={() => (dishAdding = false)}>Cancel</button><button class="btn btn-primary" onclick={createDish}>Add</button></div>

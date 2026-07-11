@@ -21,8 +21,11 @@ services:
       DATABASE_URL: postgres://restaurant:restaurant@db:5432/restaurant_orders?sslmode=disable
       JWT_SECRET: change-me-in-production
       PORT: "8080"
+      UPLOAD_DIR: /app/uploads
     ports:
       - "8080:8080"
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -32,8 +35,11 @@ services:
       context: ./frontend
     ports:
       - "3000:3000"
+    volumes:
+      - uploads:/uploads:ro
     depends_on:
       - backend
 
 volumes:
   pgdata:
+  uploads:

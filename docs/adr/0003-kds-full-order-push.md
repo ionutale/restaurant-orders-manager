@@ -1,0 +1,3 @@
+# 0003 — KDS receives full order, reveals one course at a time
+
+The waiter sends the entire multi-course order to the KDS in one request, but the KDS UI only displays the currently active course to the chef. The waiter advances courses from their device, which flips the active course and reveals the next one on the KDS. This was chosen over (a) sending courses one-by-one (more round-trips, risk of lost courses) and (b) displaying all courses at once (chef confusion, no sequencing). The trade-off is that the KDS stores the full order payload even before the later courses are relevant, which is negligible given modern hardware.

@@ -1,0 +1,3 @@
+# 0001 — Event-sourced audit log
+
+All state changes (orders placed, courses advanced, table groups created/closed, invoices sent) are recorded as immutable events in a dedicated audit table. The application tables reflect current state for fast reads; the audit log provides full traceability. This was chosen over a simple updated_at approach because the manager role requires a complete, non-repudiable history of every interaction across the restaurant — who did what, when, and in what order. The cost is dual writes (application table + audit log), which is acceptable given the system's moderate write throughput.

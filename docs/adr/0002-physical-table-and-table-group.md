@@ -1,0 +1,3 @@
+# 0002 — Physical Table plus Table Group model
+
+Tables on the floor plan are immutable physical entities (position, base capacity, never deleted). All seated parties are modeled as Table Groups — a group wraps one or more physical tables and carries the party size, custom name, and lifecycle status (open/in-progress/closed). Merging two tables is simply creating a group that references both; splitting is closing the group. This avoids a separate "merge/split" concept and lets every seated party be handled uniformly whether they occupy one table or four. The alternative was a simpler single-table model with mutable table composition, which would have made history tracking and concurrent seating harder.

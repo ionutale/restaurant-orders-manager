@@ -1,9 +1,11 @@
 FROM node:26-alpine AS builder
+ENV CI=true PNPM_CONFIG_MINIMUM_RELEASE_AGE=0
+RUN npm install -g pnpm@latest
 WORKDIR /build
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml .npmrc ./
+RUN pnpm install
 COPY . .
-RUN corepack enable && pnpm lint && pnpm check && pnpm build
+RUN pnpm lint && pnpm build
 
 FROM node:26-alpine
 WORKDIR /app

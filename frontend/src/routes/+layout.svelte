@@ -15,7 +15,7 @@
 	<div class="flex h-screen items-center justify-center">
 		<span class="loading loading-spinner loading-lg"></span>
 	</div>
-{:else if !auth.isLoggedIn && $page.url.pathname !== '/login'}
+{:else if !auth.isLoggedIn && page.url.pathname !== '/login'}
 	{goto('/login')}
 {:else}
 	{#if auth.isLoggedIn}

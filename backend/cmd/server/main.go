@@ -100,6 +100,7 @@ func main() {
 		gh := handler.NewTableGroupHandler(db)
 		r.Post("/table-groups", gh.Create)
 		r.Get("/table-groups/{id}", gh.Get)
+		r.Patch("/table-groups/{id}/tables", gh.UpdateTables)
 		r.Post("/table-groups/{id}/close", gh.Close)
 	})
 

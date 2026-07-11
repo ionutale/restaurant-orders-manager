@@ -15,6 +15,7 @@ type floorPlanTable struct {
 	Y         float64 `json:"y"`
 	Label     *string `json:"label"`
 	Status    string  `json:"status"`
+	GroupID   *int64  `json:"group_id,omitempty"`
 	GroupName *string `json:"group_name,omitempty"`
 	PartySize *int    `json:"party_size,omitempty"`
 }
@@ -31,7 +32,7 @@ func (h *FloorPlanHandler) GetFloorPlan(w http.ResponseWriter, r *http.Request) 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT t.id, t.name, t.capacity, t.x, t.y, t.label,
 			CASE WHEN tg.id IS NOT NULL THEN 'occupied' ELSE 'free' END AS status,
-			tg.name AS group_name, tg.party_size
+			tg.id AS group_id, tg.name AS group_name, tg.party_size
 		FROM tables t
 		LEFT JOIN table_group_tables tgt ON tgt.table_id = t.id
 		LEFT JOIN table_groups tg ON tg.id = tgt.group_id AND tg.status != 'closed'

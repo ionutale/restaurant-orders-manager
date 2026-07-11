@@ -146,3 +146,47 @@ func (h *TableGroupHandler) Close(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
+
+func (h *TableGroupHandler) UpdateTables(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var input struct {
+		AddTableIDs    []int64 `json:"add_table_ids"`
+		RemoveTableIDs []int64 `json:"remove_table_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		respondError(w, "database error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	for _, tid := range input.AddTableIDs {
+		_, _ = tx.Exec(r.Context(),
+			`INSERT INTO table_group_tables (group_id, table_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, id, tid)
+	}
+	for _, tid := range input.RemoveTableIDs {
+		_, _ = tx.Exec(r.Context(),
+			`DELETE FROM table_group_tables WHERE group_id = $1 AND table_id = $2`, id, tid)
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		respondError(w, "commit error", http.StatusInternalServerError)
+		return
+	}
+
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "table_group.tables_updated", "table_group", &id, input)
+	}
+	respondJSON(w, map[string]string{"status": "ok"})
+}

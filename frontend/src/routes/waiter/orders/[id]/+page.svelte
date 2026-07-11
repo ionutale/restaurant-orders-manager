@@ -22,6 +22,7 @@
 	let dishAllergens = $state<Record<number, { id: number; name: string; icon: string }[]>>({});
 	let loading = $state(true);
 	let showMenu = $state<number | null>(null);
+	let sending = $state(false);
 	let addQty = $state(1);
 	let addNotes = $state('');
 
@@ -36,6 +37,13 @@
 		if (mRes.ok) { const d = await mRes.json(); menuCats = d.categories; menuSuggestions = d.suggestions; dishAllergens = d.dish_allergens || {}; }
 		loading = false;
 	});
+
+	async function sendToKDS() {
+		sending = true;
+		const r = await fetch(`${API_BASE}/orders/${params.id}/send`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
+		if (r.ok) order = await r.json();
+		sending = false;
+	}
 
 	async function addDish(courseId: number, dishId: number) {
 		await fetch(`${API_BASE}/orders/${params.id}/courses/${courseId}/items`, {
@@ -77,7 +85,14 @@
 	{:else}
 		<div class="flex items-center justify-between">
 			<h2 class="text-2xl font-bold">Order #{order.id}</h2>
-			<span class="badge badge-lg">{order.status}</span>
+			<div class="flex items-center gap-2">
+				<span class="badge badge-lg">{order.status}</span>
+				{#if order.status === 'pending'}
+					<button class="btn btn-primary btn-sm" onclick={sendToKDS} disabled={sending}>
+						{sending ? 'Sending...' : 'Send to KDS'}
+					</button>
+				{/if}
+			</div>
 		</div>
 
 		<div class="space-y-4">

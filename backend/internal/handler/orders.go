@@ -190,6 +190,34 @@ func (h *OrderHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *OrderHandler) Send(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var currentStatus string
+	h.db.QueryRow(r.Context(), `SELECT status FROM orders WHERE id = $1`, orderID).Scan(&currentStatus)
+	if currentStatus != "pending" {
+		respondError(w, "order already sent", http.StatusBadRequest)
+		return
+	}
+
+	_, err = h.db.Exec(r.Context(), `UPDATE orders SET status = 'sent' WHERE id = $1`, orderID)
+	if err != nil {
+		respondError(w, "could not send", http.StatusInternalServerError)
+		return
+	}
+
+	// First course should already be active from creation
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "order.sent", "order", &orderID, nil)
+	}
+	respondJSON(w, h.loadOrder(r.Context(), orderID))
+}
+
 func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 	var o domain.Order
 	h.db.QueryRow(ctx,

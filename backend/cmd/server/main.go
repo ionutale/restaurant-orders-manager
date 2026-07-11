@@ -114,6 +114,15 @@ func main() {
 		r.Get("/kds/orders", oh.KDSOrders)
 		r.Patch("/kds/order-items/{itemId}/ready", oh.MarkItemReady)
 		r.Delete("/order-items/{id}", oh.DeleteItem)
+
+		ph := handler.NewPredictionHandler(db)
+		r.Get("/predictions", ph.TablePredictions)
+
+		nh := handler.NewNotificationHandler(db)
+		r.Get("/notifications", nh.Poll)
+
+		r.Post("/orders/{id}/pay", handler.PayOrder(db))
+		r.Post("/orders/{id}/send-invoice", handler.SendInvoice(db))
 	})
 
 	srv := &http.Server{

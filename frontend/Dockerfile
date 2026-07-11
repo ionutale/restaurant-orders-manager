@@ -7,10 +7,8 @@ RUN pnpm install
 COPY . .
 RUN pnpm lint && pnpm build
 
-FROM node:26-alpine
-WORKDIR /app
-COPY --from=builder /build/build ./build
-COPY --from=builder /build/package.json ./
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /build/build /usr/share/nginx/html
 EXPOSE 3000
-ENV NODE_ENV=production
-CMD ["node", "build"]
+CMD ["nginx", "-g", "daemon off;"]

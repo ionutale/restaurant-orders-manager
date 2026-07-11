@@ -84,6 +84,11 @@ func main() {
 		r.Get("/dishes/{dishId}/suggestions", ah.GetDishSuggestions)
 		r.Post("/dishes/{dishId}/suggestions", ah.CreateDishSuggestion)
 		r.Delete("/dish-suggestions/{id}", ah.DeleteDishSuggestion)
+
+		sh := handler.NewChefSuggestionHandler(db)
+		r.Get("/chef-suggestions", sh.List)
+		r.Post("/chef-suggestions", sh.Create)
+		r.Delete("/chef-suggestions/{id}", sh.Delete)
 	})
 
 	srv := &http.Server{

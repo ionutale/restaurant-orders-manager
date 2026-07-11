@@ -30,8 +30,6 @@ services:
   frontend:
     build:
       context: ./frontend
-    environment:
-      PUBLIC_API_URL: http://localhost:8080/api
     ports:
       - "3000:3000"
     depends_on:

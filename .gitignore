@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+tmp/

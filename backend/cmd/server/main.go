@@ -67,6 +67,13 @@ func main() {
 		r.Patch("/categories/{id}", ch.Update)
 		r.Delete("/categories/{id}", ch.Delete)
 		r.Post("/categories/reorder", ch.Reorder)
+
+		dh := handler.NewDishHandler(db)
+		r.Get("/dishes", dh.List)
+		r.Get("/dishes/{id}", dh.Get)
+		r.Post("/dishes", dh.Create)
+		r.Patch("/dishes/{id}", dh.Update)
+		r.Delete("/dishes/{id}", dh.Delete)
 	})
 
 	srv := &http.Server{

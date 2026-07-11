@@ -123,6 +123,15 @@ func main() {
 
 		r.Post("/orders/{id}/pay", handler.PayOrder(db))
 		r.Post("/orders/{id}/send-invoice", handler.SendInvoice(db))
+
+		auh := handler.NewAuditHandler(db)
+		r.Get("/audit-events", auh.List)
+
+		uh := handler.NewUserHandler(db)
+		r.Get("/users", uh.List)
+		r.Post("/users", uh.Create)
+		r.Patch("/users/{id}", uh.Update)
+		r.Delete("/users/{id}", uh.Delete)
 	})
 
 	srv := &http.Server{

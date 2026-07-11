@@ -50,6 +50,9 @@
 						<li><a href="/admin">Dashboard</a></li>
 						<li><a href="/admin/tables">Floor Plan</a></li>
 						<li><a href="/admin/menu">Menu</a></li>
+						<li><a href="/admin/users">Users</a></li>
+						<li><a href="/admin/invoices">Invoices</a></li>
+						<li><a href="/admin/audit">Audit Log</a></li>
 					{:else if auth.role === 'waiter'}
 						<li><a href="/waiter">Floor Plan</a></li>
 						<li><a href="/waiter/orders">Orders</a></li>

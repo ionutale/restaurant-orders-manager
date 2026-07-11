@@ -9,6 +9,7 @@
 	let tab = $state<'categories' | 'dishes'>('categories');
 	let categories = $state<{ id: number; name: string; display_order: number; icon: string }[]>([]);
 	let dishes = $state<any[]>([]);
+	let allAllergens = $state<{ id: number; name: string; icon: string }[]>([]);
 	let loading = $state(true);
 	let selCategory = $state<string>('');
 	let editingId = $state<number | null>(null);
@@ -33,6 +34,14 @@
 	let dCat = $state(0);
 	let dTime = $state(10);
 
+	let detailDishId = $state<number | null>(null);
+	let detailDishName = $state('');
+	let detailDishAllergens = $state<number[]>([]);
+	let detailWineSuggestions = $state<any[]>([]);
+	let detailSideSuggestions = $state<any[]>([]);
+	let addWineId = $state(0);
+	let addSideId = $state(0);
+
 	const token = () => localStorage.getItem('token') ?? '';
 
 	async function loadCats() {
@@ -46,13 +55,71 @@
 		if (res.ok) dishes = await res.json();
 	}
 
+	async function loadAllergens() {
+		const res = await fetch(`${API_BASE}/allergens`, { headers: { Authorization: `Bearer ${token()}` } });
+		if (res.ok) allAllergens = await res.json();
+	}
+
 	async function loadAll() {
 		loading = true;
-		await Promise.all([loadCats(), loadDishes()]);
+		await Promise.all([loadCats(), loadDishes(), loadAllergens()]);
 		loading = false;
 	}
 
 	onMount(loadAll);
+
+	async function openDetail(d: any) {
+		detailDishId = d.id;
+		detailDishName = d.name;
+
+		const [aRes, sRes] = await Promise.all([
+			fetch(`${API_BASE}/dishes/${d.id}/allergens`, { headers: { Authorization: `Bearer ${token()}` } }),
+			fetch(`${API_BASE}/dishes/${d.id}/suggestions`, { headers: { Authorization: `Bearer ${token()}` } }),
+		]);
+		if (aRes.ok) detailDishAllergens = (await aRes.json()).map((a: any) => a.id);
+		if (sRes.ok) {
+			const all = await sRes.json();
+			detailWineSuggestions = all.filter((s: any) => s.suggestion_type === 'wine');
+			detailSideSuggestions = all.filter((s: any) => s.suggestion_type === 'side');
+		}
+		addWineId = 0;
+		addSideId = 0;
+	}
+
+	async function saveAllergens() {
+		if (!detailDishId) return;
+		await fetch(`${API_BASE}/dishes/${detailDishId}/allergens`, {
+			method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+			body: JSON.stringify({ allergen_ids: detailDishAllergens }),
+		});
+	}
+
+	async function addSuggestion(type: string) {
+		if (!detailDishId) return;
+		const toId = type === 'wine' ? addWineId : addSideId;
+		if (!toId) return;
+		await fetch(`${API_BASE}/dishes/${detailDishId}/suggestions`, {
+			method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+			body: JSON.stringify({ to_dish_id: toId, suggestion_type: type }),
+		});
+		const sRes = await fetch(`${API_BASE}/dishes/${detailDishId}/suggestions`, { headers: { Authorization: `Bearer ${token()}` } });
+		if (sRes.ok) {
+			const all = await sRes.json();
+			detailWineSuggestions = all.filter((s: any) => s.suggestion_type === 'wine');
+			detailSideSuggestions = all.filter((s: any) => s.suggestion_type === 'side');
+		}
+		addWineId = 0; addSideId = 0;
+	}
+
+	async function removeSuggestion(id: number) {
+		await fetch(`${API_BASE}/dish-suggestions/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
+		const sRes = await fetch(`${API_BASE}/dishes/${detailDishId}/suggestions`, { headers: { Authorization: `Bearer ${token()}` } });
+		if (sRes.ok) {
+			const all = await sRes.json();
+			detailWineSuggestions = all.filter((s: any) => s.suggestion_type === 'wine');
+			detailSideSuggestions = all.filter((s: any) => s.suggestion_type === 'side');
+		}
+	}
 
 	async function create() {
 		if (!newName) return;
@@ -114,6 +181,9 @@
 	}
 
 	function catName(id: number) { return categories.find(c => c.id === id)?.name ?? '—'; }
+
+	function wines() { return dishes.filter(d => catName(d.category_id).toLowerCase() === 'wines').filter(d => d.id !== detailDishId); }
+	function sides() { return dishes.filter(d => catName(d.category_id).toLowerCase() !== 'wines').filter(d => d.id !== detailDishId); }
 </script>
 
 <div class="space-y-4">
@@ -128,14 +198,10 @@
 	{#if loading}
 		<div class="flex justify-center py-8"><span class="loading loading-spinner loading-lg"></span></div>
 	{:else if tab === 'categories'}
-		<div class="flex justify-end">
-			<button class="btn btn-primary btn-sm" onclick={() => (adding = true)}>Add Category</button>
-		</div>
+		<div class="flex justify-end"><button class="btn btn-primary btn-sm" onclick={() => (adding = true)}>Add Category</button></div>
 		<div class="overflow-x-auto">
 			<table class="table table-zebra">
-				<thead>
-					<tr><th>#</th><th>Name</th><th>Icon</th><th>Actions</th></tr>
-				</thead>
+				<thead><tr><th>#</th><th>Name</th><th>Icon</th><th>Actions</th></tr></thead>
 				<tbody>
 					{#each categories as c (c.id)}
 						<tr>
@@ -182,9 +248,7 @@
 
 		<div class="overflow-x-auto">
 			<table class="table table-zebra">
-				<thead>
-					<tr><th>Name</th><th>Category</th><th>Price</th><th>Time</th><th>Actions</th></tr>
-				</thead>
+				<thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Time</th><th>Actions</th></tr></thead>
 				<tbody>
 					{#if dishes.length === 0}
 						<tr><td colspan="5" class="text-center text-base-content/50">No dishes</td></tr>
@@ -193,13 +257,7 @@
 							<tr>
 								{#if dishEditingId === d.id}
 									<td><input type="text" bind:value={dishEditName} class="input input-bordered input-sm w-full" /></td>
-									<td>
-										<select bind:value={dishEditCat} class="select select-bordered select-sm">
-											{#each categories as c}
-												<option value={c.id}>{c.name}</option>
-											{/each}
-										</select>
-									</td>
+									<td><select bind:value={dishEditCat} class="select select-bordered select-sm">{#each categories as c}<option value={c.id}>{c.name}</option>{/each}</select></td>
 									<td><input type="number" bind:value={dishEditPrice} class="input input-bordered input-sm w-24" step="1" /></td>
 									<td><input type="number" bind:value={dishEditTime} class="input input-bordered input-sm w-16" min="1" /></td>
 									<td class="flex gap-1">
@@ -219,6 +277,7 @@
 									<td>{d.eating_time_min} min</td>
 									<td class="flex gap-1">
 										<button class="btn btn-ghost btn-xs" onclick={() => startEditDish(d)}>Edit</button>
+										<button class="btn btn-ghost btn-xs" onclick={() => openDetail(d)}>Details</button>
 										<button class="btn btn-ghost btn-xs text-error" onclick={() => (dishDeleteId = d.id)}>Delete</button>
 									</td>
 								{/if}
@@ -233,24 +292,19 @@
 
 {#if adding}
 	<div class="modal modal-open">
-		<div class="modal-box">
-			<h3 class="font-bold text-lg">Add Category</h3>
+		<div class="modal-box"><h3 class="font-bold text-lg">Add Category</h3>
 			<div class="py-4 space-y-3">
 				<label class="form-control"><div class="label"><span class="label-text">Name</span></div><input type="text" bind:value={newName} placeholder="Appetizers" class="input input-bordered" /></label>
-				<label class="form-control"><div class="label"><span class="label-text">Icon (optional)</span></div><input type="text" bind:value={newIcon} placeholder="🍕" class="input input-bordered" /></label>
+				<label class="form-control"><div class="label"><span class="label-text">Icon</span></div><input type="text" bind:value={newIcon} placeholder="🍕" class="input input-bordered" /></label>
 			</div>
-			<div class="modal-action">
-				<button class="btn" onclick={() => (adding = false)}>Cancel</button>
-				<button class="btn btn-primary" onclick={create}>Add</button>
-			</div>
+			<div class="modal-action"><button class="btn" onclick={() => (adding = false)}>Cancel</button><button class="btn btn-primary" onclick={create}>Add</button></div>
 		</div>
 	</div>
 {/if}
 
 {#if dishAdding}
 	<div class="modal modal-open">
-		<div class="modal-box">
-			<h3 class="font-bold text-lg">Add Dish</h3>
+		<div class="modal-box"><h3 class="font-bold text-lg">Add Dish</h3>
 			<div class="py-4 space-y-3">
 				<label class="form-control"><div class="label"><span class="label-text">Name</span></div><input type="text" bind:value={dName} class="input input-bordered" /></label>
 				<label class="form-control"><div class="label"><span class="label-text">Description</span></div><textarea bind:value={dDesc} class="textarea textarea-bordered" rows="2"></textarea></label>
@@ -259,18 +313,89 @@
 					<label class="form-control w-24"><div class="label"><span class="label-text">Time (min)</span></div><input type="number" bind:value={dTime} class="input input-bordered" min="1" /></label>
 				</div>
 				<label class="form-control"><div class="label"><span class="label-text">Category</span></div>
-					<select bind:value={dCat} class="select select-bordered">
-						<option value={0} disabled>Select category</option>
-						{#each categories as c}
-							<option value={c.id}>{c.name}</option>
-						{/each}
-					</select>
+					<select bind:value={dCat} class="select select-bordered"><option value={0} disabled>Select</option>{#each categories as c}<option value={c.id}>{c.name}</option>{/each}</select>
 				</label>
 			</div>
-			<div class="modal-action">
-				<button class="btn" onclick={() => (dishAdding = false)}>Cancel</button>
-				<button class="btn btn-primary" onclick={createDish}>Add</button>
+			<div class="modal-action"><button class="btn" onclick={() => (dishAdding = false)}>Cancel</button><button class="btn btn-primary" onclick={createDish}>Add</button></div>
+		</div>
+	</div>
+{/if}
+
+{#if detailDishId !== null}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-2xl">
+			<h3 class="font-bold text-lg">{detailDishName} — Details</h3>
+
+			<div class="py-4 space-y-6">
+				<div>
+					<h4 class="font-semibold mb-2">Allergens</h4>
+					<div class="flex flex-wrap gap-2">
+						{#each allAllergens as a}
+							<button
+								class="btn btn-sm"
+								class:btn-primary={detailDishAllergens.includes(a.id)}
+								class:btn-outline={!detailDishAllergens.includes(a.id)}
+								onclick={() => {
+									if (detailDishAllergens.includes(a.id)) {
+										detailDishAllergens = detailDishAllergens.filter(id => id !== a.id);
+									} else {
+										detailDishAllergens = [...detailDishAllergens, a.id];
+									}
+									saveAllergens();
+								}}
+							>{a.icon} {a.name}</button>
+						{/each}
+					</div>
+				</div>
+
+				<div>
+					<h4 class="font-semibold mb-2">Suggested Wines</h4>
+					<div class="flex flex-wrap gap-2 mb-2">
+						{#each detailWineSuggestions as s}
+							<div class="badge badge-lg gap-1">
+								{s.to_dish_name}
+								<button class="btn btn-ghost btn-xs text-error" onclick={() => removeSuggestion(s.id)}>✕</button>
+							</div>
+						{:else}
+							<span class="text-sm text-base-content/40">None</span>
+						{/each}
+					</div>
+					<div class="flex gap-2">
+						<select bind:value={addWineId} class="select select-bordered select-sm flex-1">
+							<option value={0} disabled>Add a wine...</option>
+							{#each wines() as w}
+								<option value={w.id}>€{(w.price_cents / 100).toFixed(2)} — {w.name}</option>
+							{/each}
+						</select>
+						<button class="btn btn-primary btn-sm" onclick={() => addSuggestion('wine')} disabled={!addWineId}>Add</button>
+					</div>
+				</div>
+
+				<div>
+					<h4 class="font-semibold mb-2">Suggested Sides</h4>
+					<div class="flex flex-wrap gap-2 mb-2">
+						{#each detailSideSuggestions as s}
+							<div class="badge badge-lg gap-1">
+								{s.to_dish_name}
+								<button class="btn btn-ghost btn-xs text-error" onclick={() => removeSuggestion(s.id)}>✕</button>
+							</div>
+						{:else}
+							<span class="text-sm text-base-content/40">None</span>
+						{/each}
+					</div>
+					<div class="flex gap-2">
+						<select bind:value={addSideId} class="select select-bordered select-sm flex-1">
+							<option value={0} disabled>Add a side...</option>
+							{#each sides() as s}
+								<option value={s.id}>€{(s.price_cents / 100).toFixed(2)} — {s.name}</option>
+							{/each}
+						</select>
+						<button class="btn btn-primary btn-sm" onclick={() => addSuggestion('side')} disabled={!addSideId}>Add</button>
+					</div>
+				</div>
 			</div>
+
+			<div class="modal-action"><button class="btn" onclick={() => (detailDishId = null)}>Close</button></div>
 		</div>
 	</div>
 {/if}

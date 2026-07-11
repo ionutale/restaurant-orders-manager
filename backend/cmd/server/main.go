@@ -74,6 +74,16 @@ func main() {
 		r.Post("/dishes", dh.Create)
 		r.Patch("/dishes/{id}", dh.Update)
 		r.Delete("/dishes/{id}", dh.Delete)
+
+		ah := handler.NewAllergenHandler(db)
+		r.Get("/allergens", ah.ListAllergens)
+		r.Post("/allergens", ah.CreateAllergen)
+		r.Delete("/allergens/{id}", ah.DeleteAllergen)
+		r.Get("/dishes/{dishId}/allergens", ah.GetDishAllergens)
+		r.Put("/dishes/{dishId}/allergens", ah.SetDishAllergens)
+		r.Get("/dishes/{dishId}/suggestions", ah.GetDishSuggestions)
+		r.Post("/dishes/{dishId}/suggestions", ah.CreateDishSuggestion)
+		r.Delete("/dish-suggestions/{id}", ah.DeleteDishSuggestion)
 	})
 
 	srv := &http.Server{

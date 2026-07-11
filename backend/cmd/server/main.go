@@ -93,6 +93,9 @@ func main() {
 
 		mh := handler.NewMenuHandler(db)
 		r.Get("/menu", mh.GetMenu)
+
+		fh := handler.NewFloorPlanHandler(db)
+		r.Get("/floor-plan", fh.GetFloorPlan)
 	})
 
 	srv := &http.Server{

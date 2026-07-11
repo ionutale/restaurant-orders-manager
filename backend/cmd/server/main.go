@@ -89,6 +89,9 @@ func main() {
 		r.Get("/chef-suggestions", sh.List)
 		r.Post("/chef-suggestions", sh.Create)
 		r.Delete("/chef-suggestions/{id}", sh.Delete)
+
+		mh := handler.NewMenuHandler(db)
+		r.Get("/menu", mh.GetMenu)
 	})
 
 	srv := &http.Server{

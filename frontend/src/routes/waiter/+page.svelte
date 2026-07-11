@@ -17,6 +17,13 @@
 		</div>
 		<div class="card bg-base-100 shadow-xl">
 			<div class="card-body">
+				<h3 class="card-title">Menu</h3>
+				<p>Browse dishes and today's chef suggestions</p>
+				<div class="card-actions"><a href="/waiter/menu" class="btn btn-primary">Browse Menu</a></div>
+			</div>
+		</div>
+		<div class="card bg-base-100 shadow-xl">
+			<div class="card-body">
 				<h3 class="card-title">Active Orders</h3>
 				<p>Manage your current orders</p>
 				<div class="card-actions"><a href="/waiter/orders" class="btn btn-primary">View Orders</a></div>

@@ -125,3 +125,42 @@ func (h *ChefSuggestionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *ChefSuggestionHandler) Renew(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	if claims == nil {
+		respondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var old domain.ChefSuggestion
+	err = h.db.QueryRow(r.Context(),
+		`SELECT name, description, price_cents FROM chef_suggestions WHERE id = $1`, id,
+	).Scan(&old.Name, &old.Description, &old.PriceCents)
+	if err != nil {
+		respondError(w, "suggestion not found", http.StatusNotFound)
+		return
+	}
+
+	expiresAt := time.Now().Add(8 * time.Hour)
+	var s domain.ChefSuggestion
+	err = h.db.QueryRow(r.Context(),
+		`INSERT INTO chef_suggestions (name, description, price_cents, shift_date, expires_at, chef_id)
+		 VALUES ($1, $2, $3, CURRENT_DATE, $4, $5)
+		 RETURNING id, name, description, price_cents, shift_date, expires_at, chef_id, created_at`,
+		old.Name, old.Description, old.PriceCents, expiresAt, claims.UserID,
+	).Scan(&s.ID, &s.Name, &s.Description, &s.PriceCents, &s.ShiftDate, &s.ExpiresAt, &s.ChefID, &s.CreatedAt)
+	if err != nil {
+		respondError(w, "could not renew", http.StatusInternalServerError)
+		return
+	}
+
+	RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "chef_suggestion.renewed", "chef_suggestion", &s.ID, map[string]interface{}{"from_id": id})
+	respondJSON(w, s)
+}

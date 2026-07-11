@@ -88,6 +88,7 @@ func main() {
 		sh := handler.NewChefSuggestionHandler(db)
 		r.Get("/chef-suggestions", sh.List)
 		r.Post("/chef-suggestions", sh.Create)
+		r.Post("/chef-suggestions/{id}/renew", sh.Renew)
 		r.Delete("/chef-suggestions/{id}", sh.Delete)
 
 		mh := handler.NewMenuHandler(db)

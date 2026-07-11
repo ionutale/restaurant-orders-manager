@@ -98,10 +98,16 @@ func main() {
 		r.Get("/floor-plan", fh.GetFloorPlan)
 
 		gh := handler.NewTableGroupHandler(db)
+		r.Get("/table-groups", gh.List)
 		r.Post("/table-groups", gh.Create)
 		r.Get("/table-groups/{id}", gh.Get)
 		r.Patch("/table-groups/{id}/tables", gh.UpdateTables)
 		r.Post("/table-groups/{id}/close", gh.Close)
+
+		oh := handler.NewOrderHandler(db)
+		r.Post("/orders", oh.Create)
+		r.Get("/orders/{id}", oh.Get)
+		r.Get("/orders", oh.List)
 	})
 
 	srv := &http.Server{

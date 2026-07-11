@@ -21,6 +21,30 @@ func NewTableGroupHandler(db *pgxpool.Pool) *TableGroupHandler {
 	return &TableGroupHandler{db: db}
 }
 
+func (h *TableGroupHandler) List(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Query(r.Context(),
+		`SELECT id, name, party_size, status, waiter_id, opened_at, closed_at
+		 FROM table_groups WHERE status != 'closed' ORDER BY opened_at DESC`)
+	if err != nil {
+		respondError(w, "database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var groups []domain.TableGroup
+	for rows.Next() {
+		var g domain.TableGroup
+		if err := rows.Scan(&g.ID, &g.Name, &g.PartySize, &g.Status, &g.WaiterID, &g.OpenedAt, &g.ClosedAt); err != nil {
+			continue
+		}
+		groups = append(groups, g)
+	}
+	if groups == nil {
+		groups = []domain.TableGroup{}
+	}
+	respondJSON(w, groups)
+}
+
 func (h *TableGroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromCtx(r.Context())
 	if claims == nil {

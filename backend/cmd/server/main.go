@@ -60,6 +60,13 @@ func main() {
 		r.Post("/tables", th.Create)
 		r.Patch("/tables/{id}", th.Update)
 		r.Delete("/tables/{id}", th.Delete)
+
+		ch := handler.NewCategoryHandler(db)
+		r.Get("/categories", ch.List)
+		r.Post("/categories", ch.Create)
+		r.Patch("/categories/{id}", ch.Update)
+		r.Delete("/categories/{id}", ch.Delete)
+		r.Post("/categories/reorder", ch.Reorder)
 	})
 
 	srv := &http.Server{

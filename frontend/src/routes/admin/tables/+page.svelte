@@ -3,19 +3,11 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import FloorPlanCanvas from '$lib/components/FloorPlanCanvas.svelte';
+	import type { FloorPlanTable as Table } from '$lib/types';
 
 	if (auth.role !== 'manager') goto('/login');
 
 	import { API_BASE } from '$lib/config';
-
-	type Table = {
-		id: number;
-		name: string;
-		capacity: number;
-		x: number;
-		y: number;
-		label: string | null;
-	};
 
 	let tables = $state<Table[]>([]);
 	let loading = $state(true);

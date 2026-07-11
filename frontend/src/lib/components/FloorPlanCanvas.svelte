@@ -1,14 +1,5 @@
 <script lang="ts">
-	type Table = {
-		id: number;
-		name: string;
-		capacity: number;
-		x: number;
-		y: number;
-		label: string | null;
-		status?: 'free' | 'occupied';
-		group_name?: string;
-	};
+	import type { FloorPlanTable as Table } from '$lib/types';
 
 	let {
 		tables,

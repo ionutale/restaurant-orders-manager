@@ -4,10 +4,10 @@
 	import { onMount } from 'svelte';
 	import { API_BASE } from '$lib/config';
 	import FloorPlanCanvas from '$lib/components/FloorPlanCanvas.svelte';
+	import type { FloorPlanTable as Table } from '$lib/types';
 
 	if (auth.role !== 'waiter') goto('/login');
 
-	type Table = { id: number; name: string; capacity: number; x: number; y: number; label: string | null; status: 'free' | 'occupied'; group_id?: number; group_name?: string; party_size?: number; };
 	type Group = { id: number; name: string | null; party_size: number; status: string; table_ids: number[] };
 	type Notif = { dish_name: string; quantity: number; table_name: string; order_id: number };
 	type Pred = { table_id: number; table_name: string; estimated_free?: string; group_name?: string; party_size?: number };

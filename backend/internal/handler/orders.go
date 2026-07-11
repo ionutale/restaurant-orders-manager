@@ -95,8 +95,16 @@ func (h *OrderHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(r.Context(),
-		`SELECT id, table_group_id, waiter_id, status, created_at FROM orders ORDER BY created_at DESC`)
+	claims := auth.ClaimsFromCtx(r.Context())
+	query := `SELECT id, table_group_id, waiter_id, status, created_at FROM orders`
+	var args []interface{}
+	if claims != nil && claims.Role == "waiter" {
+		query += ` WHERE waiter_id = $1`
+		args = append(args, claims.UserID)
+	}
+	query += ` ORDER BY created_at DESC`
+
+	rows, err := h.db.Query(r.Context(), query, args...)
 	if err != nil {
 		respondError(w, "database error", http.StatusInternalServerError)
 		return
@@ -117,6 +125,71 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, orders)
 }
 
+func (h *OrderHandler) AddItem(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	courseID, err := strconv.ParseInt(chi.URLParam(r, "courseId"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid course id", http.StatusBadRequest)
+		return
+	}
+
+	var input struct {
+		DishID           *int64 `json:"dish_id"`
+		IsChefSuggestion bool   `json:"is_chef_suggestion"`
+		ChefSuggestionID *int64 `json:"chef_suggestion_id"`
+		Quantity         int    `json:"quantity"`
+		Notes            string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if input.Quantity < 1 {
+		input.Quantity = 1
+	}
+
+	var item domain.OrderItem
+	err = h.db.QueryRow(r.Context(),
+		`INSERT INTO order_items (course_id, dish_id, is_chef_suggestion, chef_suggestion_id, quantity, notes)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, course_id, dish_id, is_chef_suggestion, chef_suggestion_id, quantity, notes, added_at`,
+		courseID, input.DishID, input.IsChefSuggestion, input.ChefSuggestionID, input.Quantity, input.Notes,
+	).Scan(&item.ID, &item.CourseID, &item.DishID, &item.IsChefSuggestion, &item.ChefSuggestionID, &item.Quantity, &item.Notes, &item.AddedAt)
+	if err != nil {
+		respondError(w, "could not add item", http.StatusInternalServerError)
+		return
+	}
+
+	// Get dish name
+	if item.DishID != nil {
+		h.db.QueryRow(r.Context(), `SELECT name FROM dishes WHERE id = $1`, *item.DishID).Scan(&item.DishName)
+	} else if item.ChefSuggestionID != nil {
+		h.db.QueryRow(r.Context(), `SELECT name FROM chef_suggestions WHERE id = $1`, *item.ChefSuggestionID).Scan(&item.DishName)
+	}
+
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "order_item.added", "order_item", &item.ID, input)
+	}
+	respondJSON(w, item)
+}
+
+func (h *OrderHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	_, err = h.db.Exec(r.Context(), `DELETE FROM order_items WHERE id = $1`, id)
+	if err != nil {
+		respondError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "order_item.deleted", "order_item", &id, nil)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 	var o domain.Order
 	h.db.QueryRow(ctx,
@@ -130,6 +203,25 @@ func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 		for cRows.Next() {
 			var c domain.OrderCourse
 			cRows.Scan(&c.ID, &c.OrderID, &c.Name, &c.DisplayOrder, &c.Status)
+
+			iRows, _ := h.db.Query(ctx,
+				`SELECT oi.id, oi.course_id, oi.dish_id, oi.is_chef_suggestion, oi.chef_suggestion_id, oi.quantity, oi.notes, oi.added_at,
+					COALESCE(d.name, cs.name, '') as dish_name
+				 FROM order_items oi
+				 LEFT JOIN dishes d ON d.id = oi.dish_id
+				 LEFT JOIN chef_suggestions cs ON cs.id = oi.chef_suggestion_id
+				 WHERE oi.course_id = $1 ORDER BY oi.added_at`, c.ID)
+			if iRows != nil {
+				for iRows.Next() {
+					var item domain.OrderItem
+					iRows.Scan(&item.ID, &item.CourseID, &item.DishID, &item.IsChefSuggestion, &item.ChefSuggestionID, &item.Quantity, &item.Notes, &item.AddedAt, &item.DishName)
+					c.Items = append(c.Items, item)
+				}
+				iRows.Close()
+			}
+			if c.Items == nil {
+				c.Items = []domain.OrderItem{}
+			}
 			o.Courses = append(o.Courses, c)
 		}
 	}

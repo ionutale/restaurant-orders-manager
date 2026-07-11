@@ -108,6 +108,8 @@ func main() {
 		r.Post("/orders", oh.Create)
 		r.Get("/orders/{id}", oh.Get)
 		r.Get("/orders", oh.List)
+		r.Post("/orders/{id}/courses/{courseId}/items", oh.AddItem)
+		r.Delete("/order-items/{id}", oh.DeleteItem)
 	})
 
 	srv := &http.Server{

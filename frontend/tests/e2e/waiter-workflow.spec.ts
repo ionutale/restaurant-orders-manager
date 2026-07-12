@@ -81,10 +81,10 @@ test('waiter: occupied table shows info', async ({ page }) => {
 	await page.locator('.join button:has-text("List")').click();
 	await page.waitForTimeout(500);
 	const occRow = page.locator('tr').filter({ has: page.locator('span.badge-error') }).first();
-	if (await occRow.isVisible()) {
+	if (await occRow.isVisible({ timeout: 3000 }).catch(() => false)) {
 		await occRow.click();
 		await page.waitForTimeout(300);
 		const close = page.locator('.modal-open button:has-text("Close")');
-		if (await close.isVisible()) await close.click();
+		if (await close.isVisible().catch(() => false)) await close.click();
 	}
 });

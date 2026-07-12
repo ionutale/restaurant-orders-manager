@@ -416,7 +416,8 @@ func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 
 			iRows, _ := h.db.Query(ctx,
 				`SELECT oi.id, oi.course_id, oi.dish_id, oi.is_chef_suggestion, oi.chef_suggestion_id, oi.quantity, oi.notes, oi.ready, oi.ready_at, oi.added_at,
-					COALESCE(d.name, cs.name, '') as dish_name
+					COALESCE(d.name, cs.name, '') as dish_name,
+					COALESCE(d.price_cents, cs.price_cents, 0) as price_cents
 				 FROM order_items oi
 				 LEFT JOIN dishes d ON d.id = oi.dish_id
 				 LEFT JOIN chef_suggestions cs ON cs.id = oi.chef_suggestion_id
@@ -424,7 +425,7 @@ func (h *OrderHandler) loadOrder(ctx context.Context, id int64) domain.Order {
 			if iRows != nil {
 				for iRows.Next() {
 					var item domain.OrderItem
-					iRows.Scan(&item.ID, &item.CourseID, &item.DishID, &item.IsChefSuggestion, &item.ChefSuggestionID, &item.Quantity, &item.Notes, &item.Ready, &item.ReadyAt, &item.AddedAt, &item.DishName)
+					iRows.Scan(&item.ID, &item.CourseID, &item.DishID, &item.IsChefSuggestion, &item.ChefSuggestionID, &item.Quantity, &item.Notes, &item.Ready, &item.ReadyAt, &item.AddedAt, &item.DishName, &item.PriceCents)
 					c.Items = append(c.Items, item)
 				}
 				iRows.Close()

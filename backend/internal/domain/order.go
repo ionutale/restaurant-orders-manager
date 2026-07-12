@@ -32,4 +32,5 @@ type OrderItem struct {
 	ReadyAt           *time.Time `json:"ready_at,omitempty"`
 	AddedAt           time.Time  `json:"added_at"`
 	DishName          string     `json:"dish_name,omitempty"`
+	PriceCents        int        `json:"price_cents"`
 }

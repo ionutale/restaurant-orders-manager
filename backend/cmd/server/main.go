@@ -116,6 +116,10 @@ func main() {
 
 		soh := handler.NewServeOrderHandler(db)
 		r.Post("/start-order", soh.Start)
+
+		dashh := handler.NewDashboardHandler(db)
+		r.Get("/dashboard/stats", dashh.Stats)
+
 		r.Get("/kds/orders", oh.KDSOrders)
 		r.Patch("/kds/order-items/{itemId}/ready", oh.MarkItemReady)
 		r.Delete("/order-items/{id}", oh.DeleteItem)

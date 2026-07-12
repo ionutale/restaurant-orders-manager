@@ -30,13 +30,13 @@ func NewFloorPlanHandler(db *pgxpool.Pool) *FloorPlanHandler {
 
 func (h *FloorPlanHandler) GetFloorPlan(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
-		SELECT t.id, t.name, t.capacity, t.x, t.y, t.label,
+		SELECT DISTINCT ON (t.id) t.id, t.name, t.capacity, t.x, t.y, t.label,
 			CASE WHEN tg.id IS NOT NULL THEN 'occupied' ELSE 'free' END AS status,
 			tg.id AS group_id, tg.name AS group_name, tg.party_size
 		FROM tables t
 		LEFT JOIN table_group_tables tgt ON tgt.table_id = t.id
 		LEFT JOIN table_groups tg ON tg.id = tgt.group_id AND tg.status != 'closed'
-		ORDER BY t.name`)
+		ORDER BY t.id, t.name`)
 	if err != nil {
 		respondError(w, "database error", http.StatusInternalServerError)
 		return

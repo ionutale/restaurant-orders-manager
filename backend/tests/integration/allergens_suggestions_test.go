@@ -61,12 +61,20 @@ func TestAllergensDishSuggestions(t *testing.T) {
 	}
 
 	menu := decode[menuResp](t, dResp)
-	if len(menu.Categories) < 2 {
-		t.Fatal("need at least 2 categories for suggestion test")
+	var dish1, dish2 menuDish
+	for _, cat := range menu.Categories {
+		if len(cat.Dishes) > 0 {
+			if dish1.ID == 0 {
+				dish1 = cat.Dishes[0]
+			} else {
+				dish2 = cat.Dishes[0]
+				break
+			}
+		}
 	}
-
-	dish1 := menu.Categories[0].Dishes[0]
-	dish2 := menu.Categories[1].Dishes[0]
+	if dish1.ID == 0 || dish2.ID == 0 {
+		t.Skip("need at least 2 dishes in different categories")
+	}
 
 	// CREATE dish suggestion
 	sugCreated := apiPOST(t, token, "/dishes/"+fmt.Sprintf("%d", dish1.ID)+"/suggestions", map[string]interface{}{

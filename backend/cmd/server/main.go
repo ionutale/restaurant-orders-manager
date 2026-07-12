@@ -109,6 +109,7 @@ func main() {
 		r.Get("/orders/{id}", oh.Get)
 		r.Get("/orders", oh.List)
 		r.Post("/orders/{id}/courses/{courseId}/items", oh.AddItem)
+		r.Post("/orders/{id}/courses", oh.AddCourse)
 		r.Post("/orders/{id}/send", oh.Send)
 		r.Post("/orders/{id}/advance-course", oh.AdvanceCourse)
 		r.Get("/kds/orders", oh.KDSOrders)

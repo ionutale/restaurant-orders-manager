@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -42,7 +43,7 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(input.CourseNames) == 0 {
-		input.CourseNames = []string{"Appetizer", "Main", "Dessert"}
+		input.CourseNames = []string{"Course 1"}
 	}
 
 	tx, err := h.db.Begin(r.Context())
@@ -124,6 +125,40 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 		orders = []domain.Order{}
 	}
 	respondJSON(w, orders)
+}
+
+func (h *OrderHandler) AddCourse(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var input struct {
+		Name string `json:"name"`
+	}
+	json.NewDecoder(r.Body).Decode(&input)
+	if input.Name == "" {
+		input.Name = fmt.Sprintf("Course %d", len(h.loadOrder(r.Context(), orderID).Courses)+1)
+	}
+
+	var c domain.OrderCourse
+	err = h.db.QueryRow(r.Context(),
+		`INSERT INTO courses (order_id, name, display_order, status)
+		 VALUES ($1, $2, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM courses WHERE order_id = $1), 'pending')
+		 RETURNING id, order_id, name, display_order, status`,
+		orderID, input.Name,
+	).Scan(&c.ID, &c.OrderID, &c.Name, &c.DisplayOrder, &c.Status)
+	if err != nil {
+		respondError(w, "could not add course", http.StatusInternalServerError)
+		return
+	}
+
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "course.created", "course", &c.ID, input)
+	}
+	respondJSON(w, c)
 }
 
 func (h *OrderHandler) AddItem(w http.ResponseWriter, r *http.Request) {

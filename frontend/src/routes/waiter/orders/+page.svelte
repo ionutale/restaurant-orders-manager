@@ -19,7 +19,6 @@
 	let loading = $state(true);
 	let showCreate = $state(false);
 	let selGroupId = $state(0);
-	let courseNames = $state(['Appetizer', 'Main', 'Dessert']);
 
 	const token = () => localStorage.getItem('token') ?? '';
 
@@ -36,17 +35,14 @@
 	onMount(load);
 
 	async function createOrder() {
-		if (!selGroupId || courseNames.filter(n => n.trim()).length === 0) return;
+		if (!selGroupId) return;
 		const res = await fetch(`${API_BASE}/orders`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-			body: JSON.stringify({ table_group_id: selGroupId, course_names: courseNames.filter(n => n.trim()) }),
+			body: JSON.stringify({ table_group_id: selGroupId }),
 		});
-		if (res.ok) { showCreate = false; selGroupId = 0; courseNames = ['Appetizer', 'Main', 'Dessert']; await load(); }
+		if (res.ok) { showCreate = false; selGroupId = 0; const o = await res.json(); goto(`/waiter/orders/${o.id}`); }
 	}
-
-	function addCourse() { courseNames = [...courseNames, '']; }
-	function removeCourse(i: number) { courseNames = courseNames.filter((_, idx) => idx !== i); }
 
 	function statusBadge(s: string) {
 		const m: Record<string, string> = { pending: 'badge-ghost', sent: 'badge-info', completed: 'badge-success', paid: 'badge-primary' };
@@ -97,18 +93,6 @@
 						{/each}
 					</select>
 				</label>
-				<div class="space-y-2">
-					<div class="flex items-center justify-between">
-						<span class="text-sm font-semibold">Courses</span>
-						<button class="btn btn-ghost btn-xs" onclick={addCourse}>+ Add Course</button>
-					</div>
-					{#each courseNames as name, i}
-						<div class="flex gap-2 items-center">
-							<input type="text" bind:value={courseNames[i]} class="input input-bordered input-sm flex-1" placeholder={`Course ${i + 1}`} />
-							<button class="btn btn-ghost btn-xs text-error" onclick={() => removeCourse(i)} disabled={courseNames.length <= 1}>✕</button>
-						</div>
-					{/each}
-				</div>
 			</div>
 			<div class="modal-action">
 				<button class="btn" onclick={() => (showCreate = false)}>Cancel</button>

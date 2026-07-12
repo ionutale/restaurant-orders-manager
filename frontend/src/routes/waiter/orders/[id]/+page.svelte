@@ -21,7 +21,9 @@
 	let menuSuggestions = $state<Suggestion[]>([]);
 	let dishAllergens = $state<Record<number, { id: number; name: string; icon: string }[]>>({});
 	let loading = $state(true);
-	let showMenu = $state<number | null>(null);
+	let showMenu = $state(false);
+	let targetCourseId = $state<number | null>(null);
+	let newCourseName = $state('');
 	let sending = $state(false);
 	let addQty = $state(1);
 	let addNotes = $state('');
@@ -38,42 +40,67 @@
 		loading = false;
 	});
 
-	async function sendToKDS() {
-		sending = true;
-		const r = await fetch(`${API_BASE}/orders/${params.id}/send`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
-		if (r.ok) order = await r.json();
-		sending = false;
-	}
-
-	async function advanceCourse() {
-		const r = await fetch(`${API_BASE}/orders/${params.id}/advance-course`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
+	async function reloadOrder() {
+		const r = await fetch(`${API_BASE}/orders/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } });
 		if (r.ok) order = await r.json();
 	}
 
-	async function addDish(courseId: number, dishId: number) {
-		await fetch(`${API_BASE}/orders/${params.id}/courses/${courseId}/items`, {
+	async function addCourse() {
+		if (!newCourseName.trim()) return;
+		await fetch(`${API_BASE}/orders/${params.id}/courses`, {
+			method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+			body: JSON.stringify({ name: newCourseName.trim() }),
+		});
+		newCourseName = '';
+		await reloadOrder();
+	}
+
+	function openAddDish(courseId: number | null) {
+		targetCourseId = courseId;
+		showMenu = true;
+		addQty = 1;
+		addNotes = '';
+	}
+
+	async function addDish(dishId: number) {
+		if (targetCourseId === null && order && order.courses.length > 0) {
+			targetCourseId = order.courses[order.courses.length - 1].id;
+		}
+		await fetch(`${API_BASE}/orders/${params.id}/courses/${targetCourseId}/items`, {
 			method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
 			body: JSON.stringify({ dish_id: dishId, quantity: addQty, notes: addNotes }),
 		});
-		addQty = 1; addNotes = ''; showMenu = null;
-		const r = await fetch(`${API_BASE}/orders/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } });
-		if (r.ok) order = await r.json();
+		addQty = 1; addNotes = ''; showMenu = false; targetCourseId = null;
+		await reloadOrder();
 	}
 
-	async function addSuggestion(courseId: number, suggestionId: number) {
-		await fetch(`${API_BASE}/orders/${params.id}/courses/${courseId}/items`, {
+	async function addSuggestion(suggestionId: number) {
+		if (targetCourseId === null && order && order.courses.length > 0) {
+			targetCourseId = order.courses[order.courses.length - 1].id;
+		}
+		await fetch(`${API_BASE}/orders/${params.id}/courses/${targetCourseId}/items`, {
 			method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
 			body: JSON.stringify({ chef_suggestion_id: suggestionId, is_chef_suggestion: true, quantity: addQty, notes: addNotes }),
 		});
-		addQty = 1; addNotes = ''; showMenu = null;
-		const r = await fetch(`${API_BASE}/orders/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } });
-		if (r.ok) order = await r.json();
+		addQty = 1; addNotes = ''; showMenu = false; targetCourseId = null;
+		await reloadOrder();
 	}
 
 	async function removeItem(itemId: number) {
 		await fetch(`${API_BASE}/order-items/${itemId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
-		const r = await fetch(`${API_BASE}/orders/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } });
-		if (r.ok) order = await r.json();
+		await reloadOrder();
+	}
+
+	async function sendToKDS() {
+		sending = true;
+		await fetch(`${API_BASE}/orders/${params.id}/send`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
+		sending = false;
+		await reloadOrder();
+	}
+
+	async function advanceCourse() {
+		await fetch(`${API_BASE}/orders/${params.id}/advance-course`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
+		await reloadOrder();
 	}
 
 	function price(cents: number) { return `€${(cents / 100).toFixed(2)}`; }
@@ -112,7 +139,9 @@
 								{course.name}
 								<span class="badge badge-sm">{course.status}</span>
 							</h3>
-							{#if order.status === 'pending'}<button class="btn btn-primary btn-sm" onclick={() => { showMenu = course.id; addQty = 1; addNotes = ''; }}>+ Add Dish</button>{/if}
+							{#if order.status === 'pending'}
+								<button class="btn btn-primary btn-sm" onclick={() => openAddDish(course.id)}>+ Add Dish</button>
+							{/if}
 						</div>
 
 						{#if (course.items?.length ?? 0) === 0}
@@ -130,7 +159,9 @@
 												{/if}
 											</div>
 										</div>
-										<button class="btn btn-ghost btn-xs text-error" onclick={() => removeItem(item.id)}>✕</button>
+										{#if order.status === 'pending'}
+											<button class="btn btn-ghost btn-xs text-error" onclick={() => removeItem(item.id)}>✕</button>
+										{/if}
 									</div>
 								{/each}
 							</div>
@@ -138,21 +169,48 @@
 					</div>
 				</div>
 			{/each}
+
+			{#if order.status === 'pending'}
+				<div class="card bg-base-200 border-2 border-dashed">
+					<div class="card-body">
+						<div class="flex items-center gap-2">
+							<input type="text" bind:value={newCourseName} placeholder="New course name..."
+								class="input input-bordered input-sm flex-1"
+								onkeydown={(e) => { if (e.key === 'Enter') addCourse(); }} />
+							<button class="btn btn-primary btn-sm" onclick={addCourse}>+ Add Course</button>
+							<button class="btn btn-ghost btn-sm" onclick={() => openAddDish(null)}>+ Add Dish</button>
+						</div>
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
 
-{#if showMenu !== null}
+{#if showMenu}
 	<div class="modal modal-open">
 		<div class="modal-box max-w-2xl">
-			<h3 class="font-bold text-lg">Add Dish to {order?.courses.find(c => c.id === showMenu)?.name}</h3>
-			<div class="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+			<h3 class="font-bold text-lg">Add Dish</h3>
+
+			<div class="py-2">
+				<label class="form-control">
+					<div class="label"><span class="label-text">Course</span></div>
+					<select bind:value={targetCourseId} class="select select-bordered select-sm">
+						<option value={null} disabled>Select course...</option>
+						{#each order?.courses ?? [] as c}
+							<option value={c.id}>{c.name}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
+
+			<div class="py-4 space-y-4 max-h-[50vh] overflow-y-auto">
 				{#if menuSuggestions.length > 0}
 					<div>
 						<h4 class="font-semibold text-sm mb-2">Chef's Suggestions</h4>
 						<div class="grid grid-cols-1 gap-2">
 							{#each menuSuggestions as s}
-								<button class="card card-compact bg-base-200 text-left hover:bg-base-300" onclick={() => addSuggestion(showMenu!, s.id)}>
+								<button class="card card-compact bg-base-200 text-left hover:bg-base-300" onclick={() => addSuggestion(s.id)} disabled={!targetCourseId}>
 									<div class="card-body py-2">
 										<div class="flex justify-between"><span class="font-medium">{s.name}</span><span class="text-sm">{price(s.price_cents)}</span></div>
 										{#if s.description}<p class="text-xs text-base-content/60">{s.description}</p>{/if}
@@ -168,7 +226,7 @@
 						<h4 class="font-semibold text-sm mb-2">{cat.category.icon} {cat.category.name}</h4>
 						<div class="grid grid-cols-1 gap-2">
 							{#each cat.dishes as d}
-								<button class="card card-compact bg-base-200 text-left hover:bg-base-300" onclick={() => addDish(showMenu!, d.id)}>
+								<button class="card card-compact bg-base-200 text-left hover:bg-base-300" onclick={() => addDish(d.id)} disabled={!targetCourseId}>
 									<div class="card-body py-2">
 										<div class="flex justify-between"><span class="font-medium">{d.name}</span><span class="text-sm">{price(d.price_cents)}</span></div>
 										<div class="flex items-center gap-2 text-xs text-base-content/60">
@@ -186,10 +244,10 @@
 
 			<div class="flex items-center gap-3 border-t pt-3">
 				<label class="form-control w-20"><div class="label"><span class="label-text">Qty</span></div><input type="number" bind:value={addQty} class="input input-bordered input-sm" min="1" /></label>
-				<label class="form-control flex-1"><div class="label"><span class="label-text">Notes (optional)</span></div><input type="text" bind:value={addNotes} placeholder="e.g. no onions" class="input input-bordered input-sm" /></label>
+				<label class="form-control flex-1"><div class="label"><span class="label-text">Notes</span></div><input type="text" bind:value={addNotes} placeholder="e.g. no onions" class="input input-bordered input-sm" /></label>
 			</div>
 
-			<div class="modal-action"><button class="btn" onclick={() => (showMenu = null)}>Close</button></div>
+			<div class="modal-action"><button class="btn" onclick={() => { showMenu = false; targetCourseId = null; }}>Close</button></div>
 		</div>
 	</div>
 {/if}

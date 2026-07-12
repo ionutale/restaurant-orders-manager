@@ -226,6 +226,35 @@ func (h *OrderHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *OrderHandler) MoveItem(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromCtx(r.Context())
+	itemID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		respondError(w, "invalid item id", http.StatusBadRequest)
+		return
+	}
+
+	var input struct {
+		CourseID int64 `json:"course_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	_, err = h.db.Exec(r.Context(),
+		`UPDATE order_items SET course_id = $1 WHERE id = $2`, input.CourseID, itemID)
+	if err != nil {
+		respondError(w, "could not move item", http.StatusInternalServerError)
+		return
+	}
+
+	if claims != nil {
+		RecordAudit(r.Context(), h.db, claims.UserID, claims.Name, "order_item.moved", "order_item", &itemID, input)
+	}
+	respondJSON(w, map[string]string{"status": "ok"})
+}
+
 func (h *OrderHandler) Send(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromCtx(r.Context())
 	orderID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)

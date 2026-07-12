@@ -25,6 +25,9 @@
 	let newCourseName = $state('');
 	let addingId = $state<number | null>(null);
 	let sending = $state(false);
+	let search = $state('');
+	let menuRef: HTMLDivElement;
+	let dragItemId = $state<number | null>(null);
 
 	const token = () => localStorage.getItem('token') ?? '';
 
@@ -77,6 +80,22 @@
 		await reload();
 	}
 
+	async function moveItem(itemId: number, targetCourseId: number) {
+		await fetch(`${API_BASE}/order-items/${itemId}/move`, {
+			method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+			body: JSON.stringify({ course_id: targetCourseId }),
+		});
+		dragItemId = null;
+		await reload();
+	}
+
+	function dragStart(itemId: number) { dragItemId = itemId; }
+	function allowDrop(e: DragEvent) { e.preventDefault(); }
+	function dropOnCourse(e: DragEvent, courseId: number) {
+		e.preventDefault();
+		if (dragItemId !== null) moveItem(dragItemId, courseId);
+	}
+
 	async function sendToKDS() { sending = true; await fetch(`${API_BASE}/orders/${params.id}/send`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } }); sending = false; await reload(); }
 	async function advanceCourse() { await fetch(`${API_BASE}/orders/${params.id}/advance-course`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } }); await reload(); }
 
@@ -113,7 +132,10 @@
 					class="btn btn-sm"
 					class:btn-primary={activeCourseId === c.id}
 					class:btn-ghost={activeCourseId !== c.id}
+					class:border-dashed={dragItemId !== null}
 					onclick={() => (activeCourseId = c.id)}
+					ondragover={allowDrop}
+					ondrop={(e) => dropOnCourse(e, c.id)}
 				>
 					{c.name}
 					<span class="badge badge-sm">{c.items?.length ?? 0}</span>
@@ -135,8 +157,15 @@
 					<p class="text-sm text-base-content/40">No dishes yet — tap + below to add</p>
 				{:else}
 					{#each activeCourse()!.items as item (item.id)}
-						<div class="flex items-center justify-between rounded-box bg-base-200 px-3 py-1.5">
+						<div class="flex items-center justify-between rounded-box bg-base-200 px-3 py-1.5"
+							draggable={order.status === 'pending'}
+							ondragstart={() => dragStart(item.id)}
+							class:opacity-50={dragItemId === item.id}
+						>
 							<div class="flex items-center gap-2">
+								{#if order.status === 'pending'}
+									<span class="cursor-grab text-base-content/30">⠿</span>
+								{/if}
 								<span class="font-medium text-sm">×{item.quantity}</span>
 								<span class="text-sm">{item.dish_name}</span>
 								{#if item.notes}<span class="badge badge-ghost badge-xs">"{item.notes}"</span>{/if}
@@ -152,49 +181,68 @@
 
 		<!-- Inline menu browser (one-tap add) -->
 		{#if order.status === 'pending'}
-			<div class="pt-2">
-				<h3 class="text-sm font-semibold mb-2">Add dishes to {activeCourse()?.name ?? 'course'}</h3>
+			<div class="pt-2" bind:this={menuRef}>
+				<div class="flex items-center gap-2 mb-2">
+					<h3 class="text-sm font-semibold cursor-pointer" onclick={() => menuRef?.scrollIntoView({ behavior: 'smooth' })}>
+						Add dishes to {activeCourse()?.name ?? 'course'}
+					</h3>
+					<input type="text" bind:value={search} placeholder="Search dishes..."
+						class="input input-bordered input-sm flex-1 max-w-xs"
+						oninput={() => {}} />
+				</div>
 
-				{#if menuSuggestions.length > 0}
+				{#if search.trim()}
+					{@const q = search.toLowerCase()}
+					<div class="flex flex-wrap gap-1 mb-2">
+						{#each menuSuggestions.filter(s => s.name.toLowerCase().includes(q)) as s}
+							<button class="btn btn-outline btn-xs gap-1" onclick={() => addSuggestion(s.id)} disabled={!activeCourseId || addingId === -s.id}>
+								{#if addingId === -s.id}<span class="loading loading-spinner loading-xs"></span>{:else}+{/if}
+								{s.name} <span class="text-base-content/50">{price(s.price_cents)}</span>
+							</button>
+						{/each}
+						{#each menuCats as cat}
+							{#each cat.dishes.filter(d => d.name.toLowerCase().includes(q)) as d}
+								<button class="btn btn-xs btn-ghost gap-1 {addingId === d.id ? 'btn-primary' : ''}"
+									onclick={() => addDish(d.id)} disabled={!activeCourseId || addingId === d.id}>
+									{#if addingId === d.id}<span class="loading loading-spinner loading-xs"></span>{:else}<span class="text-lg leading-none">+</span>{/if}
+									<span class="text-xs">{d.name}</span>
+									<span class="text-xs text-base-content/50">{price(d.price_cents)}</span>
+								</button>
+							{/each}
+						{/each}
+					</div>
+					{#if [...menuSuggestions.filter(s => s.name.toLowerCase().includes(q)), ...menuCats.flatMap(c => c.dishes.filter(d => d.name.toLowerCase().includes(q)))].length === 0}
+						<p class="text-xs text-base-content/40 py-1">No dishes match "{search}"</p>
+					{/if}
+				{:else}
+					{#if menuSuggestions.length > 0}
 					<div class="flex flex-wrap gap-1 mb-2">
 						{#each menuSuggestions as s}
 							<button class="btn btn-outline btn-xs gap-1" onclick={() => addSuggestion(s.id)} disabled={!activeCourseId || addingId === -s.id}>
-								{#if addingId === -s.id}
-									<span class="loading loading-spinner loading-xs"></span>
-								{:else}
-									+
-								{/if}
+								{#if addingId === -s.id}<span class="loading loading-spinner loading-xs"></span>{:else}+{/if}
 								{s.name}
 								<span class="text-base-content/50">{price(s.price_cents)}</span>
 							</button>
 						{/each}
 					</div>
-				{/if}
+					{/if}
 
-				{#each menuCats as cat}
-					<details class="mb-1" open={false}>
-						<summary class="cursor-pointer text-sm font-medium py-1">{cat.category.icon} {cat.category.name}</summary>
-						<div class="flex flex-wrap gap-1 pt-1">
-							{#each cat.dishes as d}
-								<button
-									class="btn btn-xs gap-1"
-									class:btn-ghost
-									class:btn-primary={addingId === d.id}
-									onclick={() => addDish(d.id)}
-									disabled={!activeCourseId || addingId === d.id}
-								>
-									{#if addingId === d.id}
-										<span class="loading loading-spinner loading-xs"></span>
-									{:else}
-										<span class="text-lg leading-none">+</span>
-									{/if}
-									<span class="text-xs">{d.name}</span>
-									<span class="text-xs text-base-content/50">{price(d.price_cents)}</span>
-								</button>
-							{/each}
-						</div>
-					</details>
-				{/each}
+					{#each menuCats as cat}
+						<details class="mb-1" open={false}>
+							<summary class="cursor-pointer text-sm font-medium py-1">{cat.category.icon} {cat.category.name}</summary>
+							<div class="flex flex-wrap gap-1 pt-1">
+								{#each cat.dishes as d}
+									<button class="btn btn-xs gap-1" class:btn-ghost class:btn-primary={addingId === d.id}
+										onclick={() => addDish(d.id)} disabled={!activeCourseId || addingId === d.id}>
+										{#if addingId === d.id}<span class="loading loading-spinner loading-xs"></span>{:else}<span class="text-lg leading-none">+</span>{/if}
+										<span class="text-xs">{d.name}</span>
+										<span class="text-xs text-base-content/50">{price(d.price_cents)}</span>
+									</button>
+								{/each}
+							</div>
+						</details>
+					{/each}
+				{/if}
 			</div>
 		{/if}
 	{/if}

@@ -65,11 +65,18 @@ func (h *TableHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	x := 0.0
 	y := 0.0
-	if input.X != nil {
+	if input.X != nil && input.Y != nil {
 		x = *input.X
-	}
-	if input.Y != nil {
 		y = *input.Y
+	} else {
+		// Auto-place in a grid based on existing table count
+		var count int
+		h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM tables`).Scan(&count)
+		cols := 5
+		row := count / cols
+		col := count % cols
+		x = 30.0 + float64(col)*160.0
+		y = 30.0 + float64(row)*130.0
 	}
 
 	var t domain.Table

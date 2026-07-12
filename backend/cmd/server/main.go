@@ -111,7 +111,11 @@ func main() {
 		r.Post("/orders/{id}/courses/{courseId}/items", oh.AddItem)
 		r.Post("/orders/{id}/courses", oh.AddCourse)
 		r.Post("/orders/{id}/send", oh.Send)
+		r.Patch("/order-items/{id}/move", oh.MoveItem)
 		r.Post("/orders/{id}/advance-course", oh.AdvanceCourse)
+
+		soh := handler.NewServeOrderHandler(db)
+		r.Post("/start-order", soh.Start)
 		r.Get("/kds/orders", oh.KDSOrders)
 		r.Patch("/kds/order-items/{itemId}/ready", oh.MarkItemReady)
 		r.Delete("/order-items/{id}", oh.DeleteItem)

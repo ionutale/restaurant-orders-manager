@@ -115,7 +115,7 @@
 							{#if order.status === 'pending'}<button class="btn btn-primary btn-sm" onclick={() => { showMenu = course.id; addQty = 1; addNotes = ''; }}>+ Add Dish</button>{/if}
 						</div>
 
-						{#if course.items.length === 0}
+						{#if (course.items?.length ?? 0) === 0}
 							<p class="text-sm text-base-content/40 py-2">No items yet</p>
 						{:else}
 							<div class="space-y-2">

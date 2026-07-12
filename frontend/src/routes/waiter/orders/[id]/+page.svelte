@@ -36,7 +36,7 @@
 			fetch(`${API_BASE}/orders/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } }),
 			fetch(`${API_BASE}/menu`, { headers: { Authorization: `Bearer ${token()}` } }),
 		]);
-		if (oRes.ok) { order = await oRes.json(); if (order.courses.length > 0) activeCourseId = order.courses[0].id; }
+		if (oRes.ok) { const o = await oRes.json() as Order; order = o; if (o.courses.length > 0) activeCourseId = o.courses[0].id; }
 		if (mRes.ok) { const d = await mRes.json(); menuCats = d.categories; menuSuggestions = d.suggestions; dishAllergens = d.dish_allergens || {}; }
 		loading = false;
 	});
@@ -232,7 +232,7 @@
 							<summary class="cursor-pointer text-sm font-medium py-1">{cat.category.icon} {cat.category.name}</summary>
 							<div class="flex flex-wrap gap-1 pt-1">
 								{#each cat.dishes as d}
-									<button class="btn btn-xs gap-1" class:btn-ghost class:btn-primary={addingId === d.id}
+									<button class="btn btn-xs gap-1 btn-ghost" class:btn-primary={addingId === d.id}
 										onclick={() => addDish(d.id)} disabled={!activeCourseId || addingId === d.id}>
 										{#if addingId === d.id}<span class="loading loading-spinner loading-xs"></span>{:else}<span class="text-lg leading-none">+</span>{/if}
 										<span class="text-xs">{d.name}</span>

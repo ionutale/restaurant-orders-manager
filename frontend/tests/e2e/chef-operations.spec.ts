@@ -36,7 +36,7 @@ test('chef: KDS dashboard shows sent orders with items', async ({ page }) => {
 		await fetch(`/api/orders/${g.id}/send`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
 		return g.id;
 	});
-	if (gid === 'no free table' || token === 'no dish' || token === 'no course') return;
+	if (gid === 'no free table' || gid === 'no dish' || gid === 'no course') return;
 
 	await page.goto('/login');
 	await page.fill('input[type="email"]', 'chef@restaurant.com');

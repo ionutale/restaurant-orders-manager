@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 )
@@ -113,5 +114,25 @@ func assertStatus(t testT, resp *http.Response, expected int) {
 	if resp.StatusCode != expected {
 		body := decode[map[string]interface{}](t, resp)
 		t.Errorf("expected status %d, got %d: %v", expected, resp.StatusCode, body)
+	}
+}
+
+// closeGroupForOrder closes the table group associated with an order.
+func closeGroupForOrder(t testT, token string, orderID int64) {
+	type orderResp struct {
+		TableGroupID int64 `json:"table_group_id"`
+	}
+	o := decode[orderResp](t, apiGET(t, token, "/orders/"+fmt.Sprintf("%d", orderID)))
+	if o.TableGroupID != 0 {
+		apiPOST(t, token, "/table-groups/"+fmt.Sprintf("%d", o.TableGroupID)+"/close", nil)
+	}
+}
+
+func closeAllGroups(t testT, token string) {
+	listResp := apiGET(t, token, "/table-groups")
+	type grp struct{ ID int64 }
+	list := decode[[]grp](t, listResp)
+	for _, g := range list {
+		apiPOST(t, token, "/table-groups/"+fmt.Sprintf("%d", g.ID)+"/close", nil)
 	}
 }

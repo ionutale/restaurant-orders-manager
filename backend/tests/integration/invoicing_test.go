@@ -75,4 +75,6 @@ func TestInvoicing(t *testing.T) {
 		t.Errorf("unexpected invoice: %+v", inv)
 	}
 	t.Logf("INVOICE ok: €%s to %s", inv.Total, inv.Email)
+
+	closeGroupForOrder(t, waiterToken, o.ID)
 }

@@ -116,6 +116,29 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := auth.ClaimsFromCtx(r.Context())
+	if claims == nil {
+		respondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Only managers can change roles
+	if input.Role != nil && claims.Role != "manager" {
+		respondError(w, "only managers can change roles", http.StatusForbidden)
+		return
+	}
+
+	// Non-managers can only edit their own profile
+	if claims.Role != "manager" && claims.UserID != id {
+		respondError(w, "cannot edit other users", http.StatusForbidden)
+		return
+	}
+	// Managers cannot change their own role (prevent self-demotion)
+	if claims.Role == "manager" && input.Role != nil && claims.UserID == id {
+		respondError(w, "cannot change your own role", http.StatusBadRequest)
+		return
+	}
+
 	var u userResp
 	err = h.db.QueryRow(r.Context(),
 		`UPDATE users SET

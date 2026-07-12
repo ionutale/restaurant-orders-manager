@@ -46,6 +46,7 @@ func main() {
 	r.Use(corsMiddleware)
 
 	r.Get("/health", handler.Health(db))
+	r.Get("/api/health", handler.Health(db))
 
 	r.Post("/api/auth/login", handler.Login(db, jwt))
 	r.Post("/api/auth/register", handler.Register(db, jwt))
